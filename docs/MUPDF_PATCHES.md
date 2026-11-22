@@ -1,6 +1,6 @@
 # Local MuPDF patch map
 
-`scripts/build-engines.sh` passes 74 `Native/mupdf*.patch` files to `scripts/apply-mupdf-patches.swift` in the order below. Purpose is summarized from the patch names and changed code. The test column points to the closest existing coverage found by inspection; **indirect** means the test exercises a related reader path, not necessarily the patched C branch. **No direct fixture found** means this inspection did not identify one. These links identify evidence to consult; they do not claim tests were run or pass. Upstream status is **unknown** here; no upstream comparison was made.
+`scripts/build-engines.sh` passes 78 `Native/mupdf*.patch` files to `scripts/apply-mupdf-patches.swift` in the order below. Purpose is summarized from the patch names and changed code. The test column points to the closest existing coverage found by inspection; **indirect** means the test exercises a related reader path, not necessarily the patched C branch. **No direct fixture found** means this inspection did not identify one. These links identify evidence to consult; they do not claim tests were run or pass. Upstream status is listed where verified.
 
 | # | Patch (application order) | Behavior changed | Closest existing evidence |
 |---:|---|---|---|
@@ -79,6 +79,10 @@
 | 72 | [mupdf-html-search-cursor-seek.patch](../Native/mupdf-html-search-cursor-seek.patch) | Resume the existing from-page source suffix using drawing-index skips and bounded preceding-text/page-reach probes, retaining whole-paragraph normalization context. | `MarkdownSearchCursor.c` compares source fields against the old suffix walker; `MarkdownFindSession.c` compares full source/geometry JSON for direction, source cursor, inclusive, wrap, scope and cancellation. |
 | 73 | [mupdf-html-font-transform-reset.patch](../Native/mupdf-html-font-transform-reset.patch) | Clear the FreeType face transform left by bitmap drawing before HTML shaping, keeping later pagination independent of rendering history. | `HTMLFontTransform.c` exercises a shared face carrying a raster transform; private full-book search comparisons cover source anchors, UTF-16 offsets, page assignment and geometry across rendering histories. |
 | 74 | [mupdf-legacy-title-page.patch](../Native/mupdf-legacy-title-page.patch) | Fit and center generated MOBI image pages and eligible FB2 title groups. Measure captions with their final alignment, reclaim redundant default title margins, and fit an eligible first title page to its cached content canvas. Explicit margins, padding, borders and image sizes retain their authored canvas; ordinary body pagination and source coordinates stay unchanged. | [LegacyTitlePageTests.swift](../Tests/SumraAppTests/LegacyTitlePageTests.swift): authored/original samples, viewport changes, constrained/inline images, overflowing captions, explicit styles, hosted paged/spread rendering, glyph extents and search transforms with nonzero page origins. |
+| 75 | [mupdf-search-position-cursor.patch](../Native/mupdf-search-position-cursor.patch) | Reuse each page's UTF-8 position when mapping nearby search matches to source offsets. | [NativePDFDisplayTests.swift](../Tests/SumraAppTests/NativePDFDisplayTests.swift) (indirect) |
+| 76 | [mupdf-epub-facing-art.patch](../Native/mupdf-epub-facing-art.patch) | Fit image-only EPUB chapters to the available page area. | [NativeReflowSpreadTests.swift](../Tests/SumraAppTests/NativeReflowSpreadTests.swift) |
+| 77 | [mupdf-epub-cover-presentation.patch](../Native/mupdf-epub-cover-presentation.patch) | Fit paired EPUB covers to the facing artwork frame. | [EPUBAuthoredImagePageTests.swift](../Tests/SumraAppTests/EPUBAuthoredImagePageTests.swift) |
+| 78 | [mupdf-actualtext-redaction.patch](../Native/mupdf-actualtext-redaction.patch) | Save redacted `ActualText` in the tagged PDF structure. [Artifex bug 709973](https://github.com/ArtifexSoftware/mupdf/commit/ab37474fcb41d23acdbc0c6be3cf8c97d32dceff) | [NativePDFToolsTests.swift](../Tests/SumraAppTests/NativePDFToolsTests.swift), [NativePDFOutputTests.swift](../Tests/SumraAppTests/NativePDFOutputTests.swift) (indirect, ordinary redaction and saved output) |
 
 The ordered candidate accepts Fitz-normalized ASCII letters/digits/basic Han with optional interior spaces, anchored by a projected first unit. It omits other source units conservatively, retains unrelated projected characters as barriers, and collapses adjacent equal projected units to tolerate duplicate-glyph removal. A trailing needle prefix remains possible at a physical page or chapter end. Parsed-chapter rejection applies to static, baseline, auto-height text with nonnegative vertical spacing; positioned, fixed-height, zero-size or vertically shifted styles retain the laid-out path because their source can disappear at a physical edge. Other query classes retain the necessary first-rune check; fixed-layout and directional text use glyph search. There is no whole-book text or result cache. The native page-window search retains its existing lookahead page instead of reloading the owner after the glyph window is complete; candidate rejection still runs before extraction on the next page.
 
@@ -88,10 +92,9 @@ The ordered candidate accepts Fitz-normalized ASCII letters/digits/basic Han wit
 
 When adding or removing an upstream patch, update this ordered inventory and record the motivating issue plus a focused sample or test when one exists. Keep purpose separate from evidence, label missing direct fixtures plainly, and do not turn this map into a release gate.
 
-The choice-values patch adds `source/pdf/pdf-js.c` and `include/mupdf/pdf/form.h`
-to the touched-file manifest.
-The pinned-base digest is `e26cab9f95be5a077621f4336b6a1e660b142e5850f4ec36f0308afdcdf1d04c`.
-It was reconstructed by reversing the complete patch sequence in a temporary
-tree: the 0.2.12 touched-file set retained its prior digest, and both added
-files matched upstream revision `f030eda1e472268667805f438e38cee8f1da61f8` byte for
-byte. The source tree itself is never reversed by the setup probe.
+The pinned-base digest is `ba67e929a683ccf4608c8f06149fc2bd7ed7cea54162481b6d2b1b5fa7f7809c`.
+It covers the 45 paths touched by the ordered patches, including
+`source/pdf/pdf-op-filter.c` added by the ActualText redaction backport.
+The digest uses the clean source at MuPDF revision
+`f030eda1e472268667805f438e38cee8f1da61f8`. The setup probe reverses patches
+only in a temporary copy of the affected files.
