@@ -389,6 +389,7 @@ struct BrowserReader: NSViewRepresentable {
         var displayedURL: URL?
         var restoringNavigation = false
         var navigationRevision: Int?
+        private var activeNavigation: WKNavigation?
         var markup: MarkupSource? { source as? MarkupSource }
         var chm: CHMSource? { source as? CHMSource }
         let scriptWorld = WKContentWorld.world(name: "SumraMarkup")
@@ -565,7 +566,7 @@ struct BrowserReader: NSViewRepresentable {
             // in WebKit's URL would start a second scroll after our activation.
             var requestURL = URLComponents(url: url, resolvingAgainstBaseURL: false)!
             requestURL.fragment = nil
-            view.load(URLRequest(url: requestURL.url!))
+            activeNavigation = view.load(URLRequest(url: requestURL.url!))
         }
 
         func position(_ value: ReadingPosition) -> [String: Any] {
@@ -665,11 +666,14 @@ struct BrowserReader: NSViewRepresentable {
                         if let page = self.pageIndex(url),
                            let item = candidates.filter({ self.pageIndex($0.1.url) == page })
                                 .min(by: { $0.0 < $1.0 })?.1 {
-                            if view.go(to: item) != nil { return }
+                            if let navigation = view.go(to: item) {
+                                self.activeNavigation = navigation
+                                return
+                            }
                         }
                         var requestURL = URLComponents(url: url, resolvingAgainstBaseURL: false)!
                         if self.pageIndex(url) != nil { requestURL.fragment = nil }
-                        view.load(URLRequest(url: requestURL.url!))
+                        self.activeNavigation = view.load(URLRequest(url: requestURL.url!))
                     } else { self.completeCommand(command.revision) }
                 }
             }
@@ -838,30 +842,44 @@ struct BrowserReader: NSViewRepresentable {
         }
 
         func webView(_ view: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            guard isCurrent, view === state.browserView else { return }
+            guard isCurrent, view === state.browserView, let navigation else { return }
+            // A WebKit-initiated load can replace a topic that is still activating.
+            if activeNavigation !== navigation { completeNavigationCommand() }
+            activeNavigation = navigation
             ready = false
             clearRangeHighlights()
         }
 
         func webView(_ view: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            navigationFailed(view, error: error)
+            navigationFailed(view, navigation, error: error)
         }
 
         func webView(_ view: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            navigationFailed(view, error: error)
+            navigationFailed(view, navigation, error: error)
         }
 
         func webViewWebContentProcessDidTerminate(_ view: WKWebView) {
-            navigationFailed(view, error: NSError(domain: WKErrorDomain, code: WKError.Code.webContentProcessTerminated.rawValue))
+            guard isCurrent, view === state.browserView else { return }
+            readerFailed(NSError(domain: WKErrorDomain, code: WKError.Code.webContentProcessTerminated.rawValue))
         }
 
-        func navigationFailed(_ view: WKWebView, error: Error) {
-            guard isCurrent else { return }
-            if view === state.browserView { readerFailed(error) }
+        private func navigationFailed(_ view: WKWebView, _ navigation: WKNavigation?, error: Error) {
+            guard isCurrent, view === state.browserView, let navigation, activeNavigation === navigation else { return }
+            let failure = error as NSError
+            if failure.domain == NSURLErrorDomain, failure.code == NSURLErrorCancelled {
+                // WebKit cancels the old load before it reports a new native link.
+                // Release the old command while keeping queued work for the next topic.
+                activeNavigation = nil
+                initialPosition = nil
+                restoringNavigation = false
+                completeNavigationCommand()
+                return
+            }
+            readerFailed(error)
         }
 
         func webView(_ view: WKWebView, didFinish navigation: WKNavigation!) {
-            guard isCurrent, view === state.browserView,
+            guard isCurrent, view === state.browserView, let navigation, activeNavigation === navigation,
                   let url = view.url, pageIndex(url) != nil else { return }
             // Activate new and cached documents at navigation completion, as
             // BrowserDocView does. JS restore owns the current item's position.
@@ -871,6 +889,7 @@ struct BrowserReader: NSViewRepresentable {
         func readerFailed(_ error: Error) {
             clearRangeHighlights()
             ready = false; readerError = error
+            activeNavigation = nil
             navigationRevision = nil
             state.error = error.localizedDescription
             pending.removeAll()
@@ -880,8 +899,9 @@ struct BrowserReader: NSViewRepresentable {
         }
 
         func activateDocument(_ view: WKWebView) {
+            guard let navigation = activeNavigation else { return }
             clearRangeHighlights()
-            let revision = navigationRevision, url = view.url
+            let url = view.url
             do {
                 if let url, let markup { state.didDisplayMarkupFile(try markup.fileURL(url)) }
             } catch { readerFailed(error); return }
@@ -902,7 +922,7 @@ struct BrowserReader: NSViewRepresentable {
             view.callAsyncJavaScript("return await window.leafCommand(command)", arguments: ["command": payload],
                 in: nil, in: scriptWorld) { [weak self, weak view] result in
                 guard let self, let view, self.isCurrent, view === self.state.browserView,
-                      view.url == url, self.navigationRevision == revision else { return }
+                      view.url == url, self.activeNavigation === navigation else { return }
                 switch result {
                 case .failure(let error): self.readerFailed(error)
                 case .success(let value):
@@ -922,13 +942,16 @@ struct BrowserReader: NSViewRepresentable {
             // UI demand may change while activation is awaiting fonts/frames.
             updateInteraction(view)
             if markup?.markdown == true { renderMermaid(view) }
-            if let revision = navigationRevision {
-                navigationRevision = nil
-                completeCommand(revision)
-            }
+            completeNavigationCommand()
             for command in pending { deliver(command, to: view) }
             pending.removeAll()
             readyHandler?(nil)
+        }
+
+        private func completeNavigationCommand() {
+            guard let revision = navigationRevision else { return }
+            navigationRevision = nil
+            completeCommand(revision)
         }
 
         func webView(_ view: WKWebView, start task: WKURLSchemeTask) {
