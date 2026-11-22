@@ -14,6 +14,8 @@ public final class Archive: @unchecked Sendable {
     private let lock = NSLock()
     private var cursor: OpaquePointer?
     private var cursorIndex = -1
+    // Bytes already consumed from the entry at cursorIndex, before EOF.
+    private var cursorPrefix: Data?
     // Encoded entry bytes have their own budget, separate from rendered pages.
     private static let entryCacheLimit = 64 * 1024 * 1024
     private var entryCache = [String: Data]()
@@ -75,7 +77,11 @@ public final class Archive: @unchecked Sendable {
         positions.keys.filter {
             !$0.split(separator: "/").contains(where: { ($0.hasPrefix(".") && $0 != "." && $0 != "..") || $0 == "__MACOSX" })
                 && Format.isComicImage($0)
-        }.sorted { $0.compare($1, options: [.numeric, .caseInsensitive]) == .orderedAscending }
+        }.sorted { left, right in
+            let order = left.compare(right, options: [.numeric, .caseInsensitive])
+            if order == .orderedSame { return left.utf8.lexicographicallyPrecedes(right.utf8) }
+            return order == .orderedAscending
+        }
     }
 
     public func data(_ name: String, prefixBytes: Int? = nil) throws -> Data {
@@ -108,53 +114,60 @@ public final class Archive: @unchecked Sendable {
                 }
                 return prefixBytes.map { data.prefix($0) } ?? data
             }
-            if cursor == nil || target <= cursorIndex {
+            let partial = target == cursorIndex ? cursorPrefix : nil
+            if cursor == nil || (target <= cursorIndex && partial == nil) {
                 resetCursor()
                 if let source { try source.seek(toOffset: 0) }
                 cursor = try Self.open(url, password: password, descriptor: source?.fileDescriptor)
             }
             guard let cursor else { throw ReadError("Cannot read archive") }
+            cursorPrefix = nil
 
+            // Skipping a solid 7z entry still decompresses its bytes. Retain
+            // recent traversed entries for reverse scrolling.
+            let readPrefix = is7Zip ? nil : prefixBytes
+            let chunkSize = 64 * 1024
+            var buffer = [UInt8](repeating: 0, count: min(chunkSize, readPrefix ?? chunkSize))
+            var result = partial ?? Data()
             var entry: OpaquePointer?
             while true {
                 try Task.checkCancellation()
-                guard try Self.next(cursor, &entry), let entry else { break }
-                guard archive_entry_filetype(entry) == 0o100000,
-                      let pathname = archive_entry_pathname_utf8(entry) ?? archive_entry_pathname(entry)
-                else {
-                    archive_read_data_skip(cursor)
-                    continue
+                if cursorIndex < target {
+                    guard try Self.next(cursor, &entry), let entry else { break }
+                    guard archive_entry_filetype(entry) == 0o100000,
+                          let pathname = archive_entry_pathname_utf8(entry) ?? archive_entry_pathname(entry)
+                    else {
+                        archive_read_data_skip(cursor)
+                        continue
+                    }
+
+                    cursorIndex += 1
+                    guard cursorIndex == target || is7Zip else {
+                        archive_read_data_skip(cursor)
+                        continue
+                    }
+                    // Reopening after disk replacement must not bind a different
+                    // entry's bytes to the name captured by the original index.
+                    guard String(cString: pathname) == entries[cursorIndex] else {
+                        throw ReadError("Archive entry changed: \(entries[cursorIndex])")
+                    }
                 }
 
-                cursorIndex += 1
-                guard cursorIndex == target || is7Zip else {
-                    archive_read_data_skip(cursor)
-                    continue
-                }
                 let currentName = entries[cursorIndex]
-                // Reopening after disk replacement must not bind a different
-                // entry's bytes to the name captured by the original index.
-                guard String(cString: pathname) == currentName else {
-                    throw ReadError("Archive entry changed: \(currentName)")
-                }
-
-                var result = Data()
-                result.reserveCapacity(64 * 1024)
-                var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-                // Skipping a solid 7z entry still decompresses its bytes. Retain
-                // recent traversed entries for reverse scrolling.
-                // ZIP keeps partial I/O and skips unrelated entries.
-                let readPrefix = is7Zip ? nil : prefixBytes
-
+                result.reserveCapacity(buffer.count)
                 while true {
                     try Task.checkCancellation()
+                    if let readPrefix, readPrefix <= result.count {
+                        cursorPrefix = result
+                        return result.prefix(readPrefix)
+                    }
                     let requested = readPrefix.map { min(buffer.count, $0 - result.count) } ?? buffer.count
-                    if requested == 0 { return result }
                     let n = archive_read_data(cursor, &buffer, requested)
                     if n == 0 {
                         if positions[currentName] == cursorIndex { remember(result, named: currentName) }
                         try Task.checkCancellation()
                         if cursorIndex == target { return prefixBytes.map { result.prefix($0) } ?? result }
+                        result = Data()
                         break
                     }
                     guard n > 0 else { throw Self.error(cursor) }
@@ -197,6 +210,7 @@ public final class Archive: @unchecked Sendable {
         if let cursor { archive_read_free(cursor) }
         cursor = nil
         cursorIndex = -1
+        cursorPrefix = nil
     }
 
     private static func open(_ url: URL, password: String?, descriptor: Int32? = nil) throws -> OpaquePointer {

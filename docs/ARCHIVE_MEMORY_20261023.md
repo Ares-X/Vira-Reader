@@ -21,6 +21,12 @@ continue from its partial position for a later target, or restart at the selecte
 reset when revisiting that partial entry. The ordinary libarchive cursor closes
 on an interrupted read and reopens when needed; completed entries survive.
 
+The November 2026 ZIP follow-up keeps the bytes of the current partial entry
+with its open cursor. A later request for that entry continues from those bytes,
+and a different uncached entry or cursor reset discards the partial bytes. Only
+complete entries enter the LRU. Comic page order uses the original filename's
+UTF-8 order to break ties in the existing case-insensitive numeric sort.
+
 ## Local evidence
 
 An optimized isolated core probe read unchanged B01 (2,100 pages, 393,454,197

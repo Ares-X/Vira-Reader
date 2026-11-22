@@ -1787,32 +1787,122 @@ final class BrowserReaderTests: XCTestCase {
         XCTAssertEqual(state.command.action, .toc, "TOC can cancel a search before all chapters finish")
     }
 
+    // Hold the main-resource responses so WebKit, not the test, cancels the first navigation.
     @MainActor
-    func testNavigationFailureAcknowledgesPendingCommandAndStaleFailureIsIgnored() async throws {
-        for terminated in [false, true] {
-            let (state, coordinator, view) = try bridgeFixture()
-            defer { BrowserReader.dismantleNSView(view, coordinator: coordinator) }
-            state.send(.print); let first = state.command
-            state.send(.toc)
-            coordinator.command = first.revision
-            coordinator.pending = [first]
-            var readyError: Error?
-            coordinator.readyHandler = { readyError = $0 }
-            if terminated { coordinator.webViewWebContentProcessDidTerminate(view) }
-            else {
-                coordinator.webView(view, didFailProvisionalNavigation: nil,
-                                    withError: NSError(domain: "Fixture navigation failed", code: 1))
+    private final class DeferredTopicResponses: NSObject, WKURLSchemeHandler {
+        let reader: BrowserReader.Coordinator
+        var held: [String: WKURLSchemeTask] = [:]
+        var cancelled: Set<String> = []
+        let failure = NSError(domain: "BrowserReaderTests", code: 17,
+                              userInfo: [NSLocalizedDescriptionKey: "The requested topic could not be read."])
+
+        init(reader: BrowserReader.Coordinator) { self.reader = reader }
+
+        func webView(_ view: WKWebView, start task: WKURLSchemeTask) {
+            let name = task.request.url?.lastPathComponent ?? ""
+            switch name {
+            case "waiting.html", "next.html": held[name] = task
+            case "broken.html": task.didFailWithError(failure)
+            default: reader.webView(view, start: task)
             }
-            try await waitForNextCommand(state, after: first.revision)
-            XCTAssertEqual(state.command.action, .toc)
-            XCTAssertTrue(coordinator.pending.isEmpty)
-            XCTAssertNotNil(coordinator.readerError)
-            XCTAssertNotNil(readyError)
-            let error = state.error
-            coordinator.active = false
-            coordinator.webView(view, didFail: nil, withError: NSError(domain: "Stale document failure", code: 2))
-            XCTAssertEqual(state.error, error)
         }
+
+        func webView(_ view: WKWebView, stop task: WKURLSchemeTask) {
+            if let name = task.request.url?.lastPathComponent, held.removeValue(forKey: name) != nil {
+                cancelled.insert(name)
+            } else {
+                reader.webView(view, stop: task)
+            }
+        }
+    }
+
+    @MainActor
+    func testSupersededTopicKeepsQueuedCommandsAndCurrentFailureIsReported() async throws {
+        let directory = try TemporaryDirectory()
+        let start = directory.url.appendingPathComponent("start.html")
+        try "<p>Starting topic</p>".write(to: start, atomically: false, encoding: .utf8)
+        for name in ["waiting.html", "next.html", "broken.html"] {
+            try "<p>\(name)</p>".write(to: directory.url.appendingPathComponent(name), atomically: false, encoding: .utf8)
+        }
+        let state = ReaderState(recordsHistory: false), source = try MarkupSource(start)
+        state.document = .init(url: start, content: .browser(source))
+        state.flow = "continuous"; state.spread = false
+        let reader = BrowserReader.Coordinator(state: state, source: source)
+        let scheme = DeferredTopicResponses(reader: reader)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        configuration.setURLSchemeHandler(scheme, forURLScheme: "leaf")
+        configuration.userContentController.add(reader, contentWorld: reader.scriptWorld, name: "leaf")
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 700, height: 500), configuration: configuration)
+        view.navigationDelegate = reader
+        state.browserView = view
+        defer {
+            BrowserReader.dismantleNSView(view, coordinator: reader)
+            state.windowClosed()
+            withExtendedLifetime(directory) {}
+        }
+        reader.load(view)
+        try await waitUntil { reader.ready || reader.readerError != nil }
+        XCTAssertNil(reader.readerError)
+
+        state.navigate(.href("leaf://book/entry/waiting.html#old"))
+        let waiting = state.command
+        reader.command = waiting.revision
+        reader.deliver(waiting, to: view)
+        state.send(.selectAll)
+        try await waitUntil { scheme.held["waiting.html"] != nil }
+        _ = try await evaluate("location.href = 'next.html'", in: view)
+        try await waitUntil { scheme.cancelled.contains("waiting.html") && scheme.held["next.html"] != nil }
+        try await waitForNextCommand(state, after: waiting.revision)
+        XCTAssertNil(state.error)
+        XCTAssertNil(reader.readerError)
+        XCTAssertFalse(reader.ready)
+        let selection = state.command
+        XCTAssertEqual(selection.action, .selectAll)
+        reader.command = selection.revision
+        reader.pending.append(selection)
+        let next = try XCTUnwrap(scheme.held.removeValue(forKey: "next.html"))
+        reader.webView(view, start: next)
+        try await waitUntil { reader.ready && state.hasSelection }
+        XCTAssertEqual(reader.displayedURL?.lastPathComponent, "next.html")
+        XCTAssertNil(state.error)
+
+        state.navigate(.href("leaf://book/entry/broken.html"))
+        try await waitForNextCommand(state, after: selection.revision)
+        let broken = state.command
+        reader.command = broken.revision
+        reader.deliver(broken, to: view)
+        state.send(.toc)
+        try await waitForNextCommand(state, after: broken.revision)
+        XCTAssertEqual(state.command.action, .toc)
+        XCTAssertEqual((reader.readerError as NSError?)?.domain, scheme.failure.domain)
+        XCTAssertEqual((reader.readerError as NSError?)?.code, scheme.failure.code)
+        XCTAssertEqual(state.error, scheme.failure.localizedDescription)
+    }
+
+    @MainActor
+    func testWebContentTerminationAcknowledgesPendingCommandOnlyForCurrentReader() async throws {
+        let (state, coordinator, view) = try bridgeFixture()
+        defer { BrowserReader.dismantleNSView(view, coordinator: coordinator) }
+        state.send(.print); let first = state.command
+        state.send(.toc)
+        coordinator.command = first.revision
+        coordinator.pending = [first]
+        var readyError: Error?
+        coordinator.readyHandler = { readyError = $0 }
+        coordinator.webViewWebContentProcessDidTerminate(view)
+        try await waitForNextCommand(state, after: first.revision)
+        XCTAssertEqual(state.command.action, .toc)
+        XCTAssertTrue(coordinator.pending.isEmpty)
+        XCTAssertNotNil(coordinator.readerError)
+        XCTAssertNotNil(readyError)
+
+        coordinator.active = false
+        state.error = nil
+        readyError = nil
+        coordinator.webViewWebContentProcessDidTerminate(view)
+        XCTAssertNil(state.error)
+        XCTAssertNil(readyError)
     }
 
     @MainActor
