@@ -117,8 +117,20 @@ final class ReaderTests:XCTestCase{
     func testDuplicateArchiveNamesDoNotCrash()throws{
         let u=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString+".cbz")
         try Data(base64Encoded:"UEsDBBQAAAAAAOJ9PV1X7nGSBQAAAAUAAAAFAAAAMS5wbmdmaXJzdFBLAwQUAAAAAADifT1daREftgYAAAAGAAAABQAAADEucG5nc2Vjb25kUEsBAhQDFAAAAAAA4n09XVfucZIFAAAABQAAAAUAAAAAAAAAAAAAAIABAAAAADEucG5nUEsBAhQDFAAAAAAA4n09XWkRH7YGAAAABgAAAAUAAAAAAAAAAAAAAIABKAAAADEucG5nUEsFBgAAAAACAAIAZgAAAFEAAAAAAA==")!.write(to:u);defer{try? FileManager.default.removeItem(at:u)}
-        let a=try Archive(u);XCTAssertEqual(a.images,["1.png"]);XCTAssertEqual(try a.data("1.png"),Data("first".utf8))
+        let a=try Archive(u);XCTAssertEqual(a.images,["1.png"])
+        XCTAssertEqual(try a.data("1.png", prefixBytes: 2), Data("fi".utf8))
+        XCTAssertEqual(try a.data("1.png"), Data("first".utf8))
     }
+    func testComicImageOrderBreaksNaturalTiesByOriginalFilename() throws {
+        // Archive order is reversed inside both natural-sort ties.
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".cbz")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try XCTUnwrap(Data(base64Encoded: "UEsDBBQAAAAAAAAAIQASHaRcCAAAAAgAAAAJAAAAcGFnZTEucG5ndW5wYWRkZWRQSwMEFAAAAAAAAAAhAJTLfbcGAAAABgAAAAoAAABwYWdlMDEucG5ncGFkZGVkUEsDBBQAAAAAAAAAIQAje5oOBQAAAAUAAAAHAAAAMDAxLnBuZ2xvd2VyUEsDBBQAAAAAAAAAIQCc319uBQAAAAUAAAAHAAAAMDAxLlBOR3VwcGVyUEsBAhQDFAAAAAAAAAAhABIdpFwIAAAACAAAAAkAAAAAAAAAAAAAAIABAAAAAHBhZ2UxLnBuZ1BLAQIUAxQAAAAAAAAAIQCUy323BgAAAAYAAAAKAAAAAAAAAAAAAACAAS8AAABwYWdlMDEucG5nUEsBAhQDFAAAAAAAAAAhACN7mg4FAAAABQAAAAcAAAAAAAAAAAAAAIABXQAAADAwMS5wbmdQSwECFAMUAAAAAAAAACEAnN9fbgUAAAAFAAAABwAAAAAAAAAAAAAAgAGHAAAAMDAxLlBOR1BLBQYAAAAABAAEANkAAACxAAAAAAA=")).write(to: url)
+        let archive = try Archive(url)
+        XCTAssertEqual(archive.images, ["001.PNG", "001.png", "page01.png", "page1.png"])
+        XCTAssertEqual(try archive.images.map { try archive.data($0) }, ["upper", "lower", "padded", "unpadded"].map { Data($0.utf8) })
+    }
+
     func testArchiveReplacementDoesNotReadAnotherEntryThroughTheOriginalIndex() throws {
         let original = try XCTUnwrap(Data(base64Encoded: "UEsDBBQAAAAAAAAAIQDxhmx6AwAAAAMAAAAFAAAAMS5wbmdvbmVQSwMEFAAAAAAAAAAhAGaKyhEDAAAAAwAAAAUAAAAyLnBuZ3R3b1BLAwQUAAAAAAAAACEA9djFRgUAAAAFAAAABQAAADMucG5ndGhyZWVQSwECFAMUAAAAAAAAACEA8YZsegMAAAADAAAABQAAAAAAAAAAAAAApIEAAAAAMS5wbmdQSwECFAMUAAAAAAAAACEAZorKEQMAAAADAAAABQAAAAAAAAAAAAAApIEmAAAAMi5wbmdQSwECFAMUAAAAAAAAACEA9djFRgUAAAAFAAAABQAAAAAAAAAAAAAApIFMAAAAMy5wbmdQSwUGAAAAAAMAAwCZAAAAdAAAAAAA"))
         let replacement = try XCTUnwrap(Data(base64Encoded: "UEsDBBQAAAAAAAAAIQD12MVGBQAAAAUAAAAFAAAAMy5wbmd0aHJlZVBLAwQUAAAAAAAAACEAZorKEQMAAAADAAAABQAAADIucG5ndHdvUEsDBBQAAAAAAAAAIQDxhmx6AwAAAAMAAAAFAAAAMS5wbmdvbmVQSwECFAMUAAAAAAAAACEA9djFRgUAAAAFAAAABQAAAAAAAAAAAAAApIEAAAAAMy5wbmdQSwECFAMUAAAAAAAAACEAZorKEQMAAAADAAAABQAAAAAAAAAAAAAApIEoAAAAMi5wbmdQSwECFAMUAAAAAAAAACEA8YZsegMAAAADAAAABQAAAAAAAAAAAAAApIFOAAAAMS5wbmdQSwUGAAAAAAMAAwCZAAAAdAAAAAAA"))
@@ -133,6 +145,9 @@ final class ReaderTests:XCTestCase{
                 XCTAssertEqual(try archive.data("3.png", prefixBytes: 1), Data("t".utf8))
             }
             try replacement.write(to: url, options: .atomic)
+            if reopen {
+                XCTAssertEqual(try archive.data("3.png"), Data("three".utf8))
+            }
             // The replacement has the same names and bytes in a new order.
             // A stale index must never silently label 3.png bytes as 1.png.
             XCTAssertThrowsError(try archive.data("1.PNG")) { error in

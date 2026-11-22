@@ -11,7 +11,7 @@ final class ArchiveCacheTests: XCTestCase {
         var names = [String]()
         for (index, size) in sizes.enumerated() {
             let name = "\(index).png"
-            try Data(repeating: 65, count: size).write(to: root.appendingPathComponent(name))
+            try Data(repeating: UInt8(65 + index), count: size).write(to: root.appendingPathComponent(name))
             names.append(name)
         }
         let process = Process()
@@ -23,6 +23,29 @@ final class ArchiveCacheTests: XCTestCase {
         XCTAssertEqual(process.terminationStatus, 0)
         let url = root.appendingPathComponent("comic.zip")
         return url
+    }
+
+    func testZipCompletesTheCurrentPrefixWithoutReopening() async throws {
+        let size = 64 * 1024 + 3
+        let url = try zip([1, size, 3])
+        let archive = try Archive(url)
+        XCTAssertEqual(try archive.data("0.png"), Data([65]))
+        XCTAssertEqual(try archive.data("1.png", prefixBytes: 1024), Data(repeating: 66, count: 1024))
+        try FileManager.default.moveItem(at: url, to: url.appendingPathExtension("moved"))
+
+        let cancelledRead = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try archive.data("1.png")
+        }
+        do { _ = try await cancelledRead.value; XCTFail("A cancelled request must not consume the current entry") }
+        catch is CancellationError { }
+
+        XCTAssertEqual(try archive.data("1.png", prefixBytes: 7), Data(repeating: 66, count: 7))
+        XCTAssertEqual(try archive.data("1.png", prefixBytes: 2048), Data(repeating: 66, count: 2048))
+        XCTAssertEqual(try archive.data("0.png"), Data([65]))
+        XCTAssertEqual(try archive.data("1.png"), Data(repeating: 66, count: size))
+        XCTAssertEqual(try archive.data("2.png"), Data(repeating: 67, count: 3))
+        XCTAssertEqual(try archive.data("1.png"), Data(repeating: 66, count: size))
     }
 
     func testEntryCacheEvictsByBytesAndPromotesRevisitedEntry() throws {
@@ -48,6 +71,7 @@ final class ArchiveCacheTests: XCTestCase {
         let url = try zip([1, size])
         let archive = try Archive(url)
         XCTAssertEqual(try archive.data("0.png"), Data([65]))
+        XCTAssertEqual(try archive.data("1.png", prefixBytes: 1024), Data(repeating: 66, count: 1024))
         XCTAssertEqual(try archive.data("1.png").count, size)
         let moved = url.appendingPathExtension("moved")
         try FileManager.default.moveItem(at: url, to: moved)
