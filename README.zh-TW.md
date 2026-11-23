@@ -38,15 +38,6 @@ App 使用維護者的 **Ares-X Code Signing** 自簽憑證，未經 Apple 公�
 
 選擇「Help → 檢查是否有更新…」即可透過 Sparkle 取得新版，也可在設定中啟用自動檢查。發行頁提供 SHA-256 檢查碼與對應的原始碼。
 
-<details>
-<summary>從 Sumra 移轉與系統相容性</summary>
-
-Vira Reader 是 Sumra 的新名稱。手動安裝一次即可切換至新的更新來源。初次開啟時會匯入 Sumra 的偏好設定與閱讀記錄，並保留 Vira Reader 既有的設定。若需要重新設定檔案預設開啟方式，可在 Finder 中調整。macOS 的視窗回復狀態會重新建立。
-
-最低部署目標是 macOS 13。下方記錄的移轉與閱讀功能驗證使用 macOS 26.6.2 虛擬機器。[移轉與相容性驗證](docs/RELEASE_0_2_48_ACCEPTANCE.md)
-
-</details>
-
 ## 專為閱讀打造
 
 - **從 Finder 開啟，接續上次閱讀。** 使用原生 Mac 視窗或分頁，快速回到最近開啟的檔案和儲存的閱讀位置。
