@@ -1,71 +1,70 @@
 <p align="center">
-  <img src="docs/images/vira-reader-brand.png" alt="Vira Reader — 輕巧、開源的 macOS 閱讀器" width="720">
+  <img src="docs/images/vira-reader-icon.png" width="88" height="88" alt="">
 </p>
 
-# Vira Reader — 輕巧純粹的 macOS 閱讀器
+<h1 align="center">Vira Reader</h1>
 
-**電子書、漫畫、PDF、圖片與 Markdown，一款原生 Mac App，專注閱讀。**
+<p align="center"><strong>原生 macOS 閱讀器，輕鬆閱讀電子書、漫畫、PDF、圖片和 Markdown。</strong></p>
 
-[English](README.md) · [简体中文](README.zh-CN.md) · **繁體中文** · [日本語](README.ja.md)
+<p align="center">macOS 13 或以上版本 · Apple 晶片 · 免費開源</p>
 
-**macOS 13 以上版本 · Apple Silicon · 免費開源**
+<p align="center">
+  <a href="https://github.com/Ares-X/Vira-Reader/releases/latest"><strong>下載 Mac 版</strong></a>
+  · <a href="#支援的格式">支援格式</a>
+  · <a href="https://github.com/Ares-X/Vira-Reader/releases">版本說明</a>
+</p>
 
-[**下載 Vira Reader**](https://github.com/Ares-X/Vira-Reader/releases/latest) · [版本資訊](https://github.com/Ares-X/Vira-Reader/releases) · [支援格式](#支援的格式) · [從原始碼建置](#從原始碼建置) · [回報問題](https://github.com/Ares-X/Vira-Reader/issues)
+<p align="center">
+  <a href="README.md">English</a>
+  · <a href="README.zh-CN.md">简体中文</a>
+  · <strong>繁體中文</strong>
+  · <a href="README.ja.md">日本語</a>
+</p>
 
-Vira Reader 是 Sumra 的新名稱。首頁、淺色和深色截圖展示 Vira Reader；雙頁截圖展示更名前的 Sumra 版本。從 Sumra 0.2.47 遷移時，由於 App 使用新的 bundle identifier 和更新來源，需手動安裝一次。
-
-從 Finder 開啟 EPUB 小說、漫畫壓縮檔、圖片資料夾、Markdown 筆記或 PDF。在原生 Mac 視窗和分頁中閱讀，選擇合適的版面配置，再透過目錄、搜尋和書籤找到想看的內容。
-
-![Vira Reader 淺色模式畫面，顯示 Markdown 閱讀筆記與目錄](docs/images/reader-light.png)
-
-<details>
-<summary>更多截圖：雙頁閱讀、最近開啟的檔案與深色模式</summary>
-
-![舊版 Sumra：雙頁閱讀與目錄側邊欄](docs/images/reader-two-pages.png)
-
-![Vira Reader 首頁上的最近文件](docs/images/home-light.png)
-
-![Vira Reader 深色模式閱讀畫面](docs/images/reader-dark.png)
-
-所有截圖都使用儲存庫中的[原創示範文件](docs/demos/Reading-Notes.md)。
-
-</details>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/reader-dark.png">
+    <img src="docs/images/reader-light.png" width="850" alt="Vira Reader 的 Markdown 閱讀畫面，左側為目錄">
+  </picture>
+</p>
 
 ## 安裝並開始閱讀
 
-1. 從[最新版本下載頁面](https://github.com/Ares-X/Vira-Reader/releases/latest)下載 Vira Reader 的 App ZIP 檔並解壓縮。
-2. 將 **Vira Reader.app** 移至「**應用程式**」資料夾，然後開啟。
-3. 按 **⌘O** 開啟檔案，或將檔案拖進視窗；按 **⌘F** 搜尋文件內容。
+1. 從[最新版本](https://github.com/Ares-X/Vira-Reader/releases/latest)下載檔名以 **-macOS-arm64.zip** 結尾的安裝檔。
+2. 解壓縮後，將 **Vira Reader.app** 移至「應用程式」。
+3. 開啟 App，按 **⌘O** 或直接拖入檔案。按 **⌘F** 搜尋內文。
 
-公開版本使用維護者的 **Ares-X Code Signing** 自簽憑證，並非 Apple Developer ID 憑證，也未經 Apple 公證。如果 macOS 阻擋首次開啟，而你確認下載來源可信，請依照 [Apple 的說明](https://support.apple.com/zh-tw/102445)，前往 **系統設定 → 隱私權與安全性 → 強制打開**，再確認開啟。
+App 使用維護者的 **Ares-X Code Signing** 自簽憑證，未經 Apple 公證。若 macOS 阻擋首次開啟，且你確定下載來源可信，可前往「系統設定 → 隱私權與安全性 → 強制打開」。[Apple 官方說明](https://support.apple.com/zh-tw/102445)
 
-**更新：**選擇 **Help → 檢查是否有更新…**，或在 **Settings（設定）** 中啟用自動檢查。Sparkle 會驗證更新，並在你確認後安裝。每個版本也會附上相對應的原始碼與 SHA-256 校驗碼。
+選擇「Help → 檢查是否有更新…」即可透過 Sparkle 取得新版，也可在設定中啟用自動檢查。發行頁提供 SHA-256 檢查碼與對應的原始碼。
 
 <details>
-<summary>相容性與舊版安裝說明</summary>
+<summary>從 Sumra 移轉與系統相容性</summary>
 
-發行版以 **Apple Silicon（arm64）** 為目標平台，最低系統目標為 **macOS 13**。打包時會檢查內附執行檔和程式庫的 arm64 支援、最低部署版本與執行階段相依項目。閱讀器 GUI 已在 macOS 26.6.2 虛擬機完成驗收；尚未在 macOS 13 實機上驗證。
+Vira Reader 是 Sumra 的新名稱。手動安裝一次即可切換至新的更新來源。初次開啟時會匯入 Sumra 的偏好設定與閱讀記錄，並保留 Vira Reader 既有的設定。若需要重新設定檔案預設開啟方式，可在 Finder 中調整。macOS 的視窗回復狀態會重新建立。
 
-**從 Sumra 遷移：**需手動安裝一次 **Vira Reader.app**；新 App 使用新的 bundle identifier 和獨立更新來源，Sumra 不再提供 App 內更新。首次啟動會複製舊偏好設定和閱讀歷程，並保留 Vira Reader 已有的選擇；已在 macOS 26.6.2 虛擬機透過手動安裝驗證受控閱讀歷程、字級、語言和自動更新選擇的遷移，原 Sumra 設定保持不變。預設檔案關聯和 macOS 視窗恢復狀態不在此偏好設定遷移範圍內。
-
-Vira Reader 使用獨立更新來源，提供 Vira Reader 版本更新。PostScript 和 EPS 需要另外安裝 Ghostscript。
+最低部署目標是 macOS 13。下方記錄的移轉與閱讀功能驗證使用 macOS 26.6.2 虛擬機器。[移轉與相容性驗證](docs/RELEASE_0_2_48_ACCEPTANCE.md)
 
 </details>
 
 ## 專為閱讀打造
 
-- **原生視窗與分頁。**從 Finder 開啟、將檔案拖進 Vira Reader，或從首頁繼續閱讀。在 **Settings（設定）** 中啟用 **Use window tabs（使用視窗分頁）**，即可在同一個視窗中閱讀多本書。
-- **適合文件的版面配置。**提供單頁、連續捲動和雙頁跨頁模式，並可調整主題與排版。可重排版電子書會配合視窗調整；固定版面則保留原有頁面配置。
-- **快速找到閱讀位置。**提供目錄、章節標題搜尋、全文搜尋、縮圖、書籤，以及可選的閱讀位置記錄。若 TXT 和 MOBI 沒有作者編製的目錄，也能偵測獨立成行的章節標題。
-- **瀏覽漫畫合集。**壓縮檔中的資料夾會成為目錄項目，並保留名稱與層級。適用的 solid LZMA2 壓縮檔可透過記憶體中的區段索引快速跳至較遠位置，不會修改原檔，也不會在磁碟上建立解壓後的書籍快取。
-- **處理 PDF。**填寫表單、編輯註解、復原與重做、擷取或合併頁面，並儲存變更。PDF 編輯功能預設鎖定，選擇 **Enable Editing（啟用編輯）** 後才能使用。**Save a Copy…（儲存副本）** 會保留可編輯的表單與註解；**Export PDF…（匯出 PDF）** 則會建立靜態閱讀副本。
-- **朗讀、列印與匯出。**使用系統語音朗讀全文或選取文字，透過 macOS 列印面板列印，或匯出 PDF。可用功能視檔案格式和文件權限而定。
+- **從 Finder 開啟，接續上次閱讀。** 使用原生 Mac 視窗或分頁，快速回到最近開啟的檔案和儲存的閱讀位置。
+- **依閱讀習慣調整版面。** 支援單頁、連續捲動與雙頁閱讀。可選擇五種內建主題或自訂配色，並調整可重排文字的字體、行距和邊界。
+- **找段落、跳章節。** 使用全文搜尋、目錄、縮圖和書籤。漫畫壓縮檔可依資料夾層級瀏覽，EPUB 與漫畫支援 Finder「快速查看」。
+- **直接處理 PDF。** 選擇「啟用編輯」後，即可填寫表單、新增註解、擷取或合併頁面，並儲存修改。「儲存副本」保留可編輯的表單與註解。「輸出 PDF」會建立靜態副本。
+- **朗讀、列印或輸出。** 使用 macOS 系統語音朗讀文字或選取範圍，也可透過系統列印面板列印。可用操作取決於檔案格式與權限。
 
-使用側邊欄查看目錄、縮圖和書籤；透過 **View（檢視）** 選單調整版面配置與主題；在 **Settings（設定）** 中管理排版、歷史記錄和分頁。**Help → 鍵盤快速鍵** 會列出指令；你也可以在 Settings 中自訂快速鍵。
+[閱讀控制項與快速鍵](docs/READER_CONTROLS.md) · [SyncTeX 整合](docs/SYNCTEX.md) · [Markdown 範例文件](docs/demos/Reading-Notes.md)
 
-可選擇五種內建閱讀主題，也可自訂並儲存文字、背景和連結色彩。現有自訂主題與已儲存設定仍可繼續使用：
+<details>
+<summary>閱讀主題與最近開啟的文件</summary>
 
-![Vira Reader 五種內建閱讀主題預覽](docs/images/themes.png)
+![五種內建閱讀主題](docs/images/themes.png)
+
+![Vira Reader 首頁中的最近文件](docs/images/home-light.png)
+
+</details>
 
 ## 支援的格式
 
@@ -78,23 +77,13 @@ Vira Reader 使用獨立更新來源，提供 Vira Reader 版本更新。PostScr
 | 其他相容格式 | PDF 相容的 AI、P7M 封裝檔、LIT |
 | 需要額外軟體 | PostScript / EPS：請另外安裝 Ghostscript |
 
-支援情況會因檔案變體而異。Vira Reader 不提供 OCR 或 DRM 移除功能；掃描頁面必須已有文字層，才能搜尋文字。
+支援範圍視實際檔案而定。掃描頁面需有文字層才能搜尋。App 未提供 OCR 或 DRM 移除功能。
 
-<details>
-<summary>顯示方式與格式限制</summary>
-
-- Markdown 使用 MuPDF，也可選擇 WebKit 相容模式。HTML 和 CHM 使用 WebKit 閱讀；列印和匯出 PDF 則使用 MuPDF 排版，結果可能與閱讀畫面不同。
-- 可重排版電子書和原生 Markdown 會精簡一般正文中重複的空白行與空段落，同時保留預先格式化的文字、表格、圖片區塊和明確的分頁。辨識出的 CHM 正文也會採用較緊湊的段落間距；調整字型、大小或行距會覆蓋出版者樣式。
-- PDF 中的黑白文字掃描頁面會自動增強對比。若要查看原始外觀，請在 **View → Document Colors（文件顏色）** 中關閉 **增強掃描頁面**。原始檔案不會變更。
-- 區段索引可略過適用漫畫壓縮檔中較早的獨立區段。第一次跳轉仍需解碼目標區段內前面的資料，因此並非每個尚未讀取的位置都能立即開啟。
-
-詳情請參閱[格式與引擎支援範圍](docs/SUMATRA_ENGINE_PARITY.md)、[Markdown 顯示方式](docs/MARKDOWN_RENDERER_DECISION.md)和[漫畫區段跳轉](docs/COMIC_SEEK_INDEX_20261020.md)。
-
-</details>
+[格式與引擎支援範圍](docs/SUMATRA_ENGINE_PARITY.md) · [Markdown 顯示方式](docs/MARKDOWN_RENDERER_DECISION.md) · [掃描 PDF 顯示](docs/SCANNED_PDF_DISPLAY.md)
 
 ## 從原始碼建置
 
-需要 macOS、Apple Swift 工具鏈與 macOS SDK，以及 CMake。首次建置需要網路連線，以取得固定版本的原生相依項目和 Sparkle。專案建置與封裝腳本使用 Swift 和系統工具，不需要 Python。
+需要 macOS、Apple Swift 工具鏈、macOS SDK 與 CMake。首次建置會下載固定版本的原生相依套件與 Sparkle。
 
 ```sh
 git clone https://github.com/Ares-X/Vira-Reader.git
@@ -103,17 +92,13 @@ cd Vira-Reader
 open "dist/Vira Reader.app"
 ```
 
-如需安裝 CMake，可使用你的套件管理工具，例如 `brew install cmake`。若要建置並啟動開發版本，請使用 `./scripts/run-dev.sh`。本機建置預設採用 ad-hoc 簽署。
-
-Vira Reader 是圖形介面應用程式；開啟檔案、使用文件工具和列印都透過介面操作。開發資訊請參閱[實作說明](docs/IMPLEMENTATION_STATUS.md)、[本機檢查](scripts/check-source.sh)和[發布流程](docs/RELEASE_ACTIONS.md)。
+執行 `./scripts/run-dev.sh` 即可建置並開啟開發版。本機建置使用臨時簽署。[本機檢查](scripts/check-source.sh) · [發行流程](docs/RELEASE_ACTIONS.md)
 
 ## 參與貢獻與翻譯
 
-設定提供 25 個常用介面語言／地區選項，受管理的介面文案已補齊，歡迎母語使用者繼續校訂。正文的字型涵蓋範圍取決於內嵌、隨附及已安裝字型。完整名單、已測文字與排版限制見[語言支援與驗證](docs/LANGUAGE_SUPPORT.md)。
+回報時請提供 macOS 和 Vira Reader 的版本、檔案格式與重現步驟。若方便，請附上可公開分享的範例檔。[回報問題或提出建議](https://github.com/Ares-X/Vira-Reader/issues)
 
-歡迎[回報錯誤、提出功能建議](https://github.com/Ares-X/Vira-Reader/issues)和提交 Pull Request。回報時請盡可能附上 macOS 與 Vira Reader 版本、檔案格式、重現步驟，以及可分享的範例檔案。
-
-README 提供英文、簡體中文、繁體中文和日文版本。請以 [README.md](README.md) 為內容參考，維持相同的章節順序，並在共通資訊變更時更新其他語言版本。所有版本共用相同的截圖，並連結至技術文件。
+App 提供 25 種介面語言和地區選項，歡迎母語使用者協助校訂。更新 README 的共用資訊時，請同步維護四種語言版本。[語言支援](docs/LANGUAGE_SUPPORT.md)
 
 <!-- community-contributors:start -->
 ## 社群貢獻者
