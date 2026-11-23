@@ -38,15 +38,6 @@ The app uses the maintainer’s self-signed **Ares-X Code Signing** certificate 
 
 Use **Help → Check for Updates** to get new versions through Sparkle, or enable automatic checks in Settings. The release page includes SHA-256 checksums and corresponding source code.
 
-<details>
-<summary>Moving from Sumra and macOS compatibility</summary>
-
-Vira Reader is the new name of Sumra. Install **Vira Reader.app** manually once to switch to its update feed. On first launch, it imports Sumra preferences and reading history while preserving any choices already saved in Vira Reader. Set default file associations again in Finder if needed. macOS window restoration starts fresh.
-
-The minimum deployment target is macOS 13. The migration and reader checks linked below ran in a macOS 26.6.2 VM. [Migration and compatibility checks](docs/RELEASE_0_2_48_ACCEPTANCE.md)
-
-</details>
-
 ## Made for reading
 
 - **Open from Finder and pick up where you left off.** Use native Mac windows or tabs, and return to recent files and saved reading positions.
